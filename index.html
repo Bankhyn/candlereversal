@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Multi Fibo Quiz + Vertical Line + Crosshair + Horizontal</title>
+  <style>
+    body { background: #fff; }
+    #answer-box {
+      display: block;
+      margin: 40px auto 0 auto;
+      width: 280px;
+      padding: 15px;
+      border: 2px dashed #3480d4;
+      background: #f3faff;
+      text-align: center;
+      border-radius: 10px;
+      font-size: 16px;
+    }
+    #answer-box .result { font-weight: bold; font-size: 16px; margin-top:12px; }
+    #checkAnswerBtn[disabled], #removeBtn[disabled] { opacity:0.4; cursor:not-allowed; }
+    #removeBox { margin-top:15px; }
+    #fibIndex { width:35px; font-size:14px; }
+  </style>
+</head>
+<body>
+<div style="position:relative; width:1355px; height:786px; margin:auto; margin-top:40px;">
+  <img src="quiz2.png" style="position:absolute;top:0;left:0;width:1355px;height:786px;z-index:1;">
+  <canvas id="quiz1canvas" width="1355" height="786"
+    style="position:absolute;top:0;left:0;width:1355px;height:786px;z-index:2; background:rgba(0,150,255,0.05); border:2px solid red; cursor:crosshair;">
+  </canvas>
+</div>
+<div id="answer-box">
+  <div id="question"></div>
+  <button id="checkAnswerBtn" disabled>ส่งคำตอบ</button>
+  <div id="removeBox" style="display:none;">
+    เลขฟิโบที่ต้องการลบ: <input type="number" min="1" id="fibIndex"> 
+    <button id="removeBtn">ลบฟิโบนี้</button>
+  </div>
+  <div class="result"></div>
+</div>
+<script>
+const steps = [
+  {
+    question: "1.กรุณาหาแท่งเทียนกลับตัวที่STO OVB หมายเลข 1",
+    type: "horizontal",
+    answerY: 85
+  },
+  {
+    question: "2.กรุณาหาแท่งเทียนกลับตัวที่STO OVS หมายเลข 2",
+    type: "horizontal",
+    answerY: 196
+  },
+  {
+    question: "3.กรุณาหาแท่งเทียนกลับตัวที่STO OVB หมายเลข 3",
+    type: "horizontal",
+    answerY: 194
+  },
+  {
+    question: "4.กรุณาหาแท่งเทียนกลับตัวที่STO OVS หมายเลข 4",
+    type: "horizontal",
+    answerY: 195
+  },
+  {
+    question: "5.กรุณาหาแท่งเทียนกลับตัวที่STO OVB หมายเลข 5",
+    type: "horizontal",
+    answerY: 201
+  },
+  {
+    question: "6.กรุณาหาแท่งเทียนกลับตัวที่STO OVS หมายเลข 6",
+    type: "horizontal",
+    answerY: 224
+  },
+  {
+    question: "7.กรุณาหาแท่งเทียนกลับตัวที่STO OVB หมายเลข 7",
+    type: "horizontal",
+    answerY: 232
+  },
+  {
+    question: "8.กรุณาหาแท่งเทียนกลับตัวที่STO OVS หมายเลข 8",
+    type: "horizontal",
+    answerY: 291
+  },
+  {
+    question: "9.กรุณาหาแท่งเทียนกลับตัวที่STO OVb หมายเลข 9",
+    type: "horizontal",
+    answerY: 273
+  },
+  {
+    question: "10.กรุณาหาแท่งเทียนกลับตัวที่STO OVS หมายเลข 10",
+    type: "horizontal",
+    answerY: 512
+  },
+  {
+    question: "11.กรุณาหาแท่งเทียนกลับตัวที่STO OVB หมายเลข 11",
+    type: "horizontal",
+    answerY: 500
+  },
+  {
+    question: "12.กรุณาหาแท่งเทียนกลับตัวที่STO OVS หมายเลข 12",
+    type: "horizontal",
+    answerY: 549
+  },
+  {
+    question: "13.กรุณาหาแท่งเทียนกลับตัวที่STO OVB หมายเลข 12",
+    type: "horizontal",
+    answerY: 546
+  },
+  {
+    question: "14.กรุณาหาแท่งเทียนกลับตัวที่STO OVS หมายเลข 14",
+    type: "horizontal",
+    answerY: 546
+  },
+  {
+    question: "15.กรุณาหาแท่งเทียนกลับตัวที่STO OVB หมายเลข 15",
+    type: "horizontal",
+    answerY: 411
+  }
+];
+
+let currentStep = 0;
+let lines = [];
+let tempLine = null;
+let tempX = null;
+let tempY = null;
+let crossX = null, crossY = null;
+let lockX = null; // ใช้ล็อก x เมื่อคลิกวางเส้น horizontal
+
+const canvas = document.getElementById('quiz1canvas');
+const ctx = canvas.getContext('2d');
+const questionDiv = document.getElementById('question');
+const checkBtn = document.getElementById('checkAnswerBtn');
+const resultDiv = document.querySelector('.result');
+const removeBox = document.getElementById('removeBox');
+const removeBtn = document.getElementById('removeBtn');
+const fibIndexInput = document.getElementById('fibIndex');
+let isDrawing = false, startX = 0, startY = 0, endX = 0, endY = 0, isFinishedDraw = false;
+
+function showStep() {
+  questionDiv.textContent = steps[currentStep].question || "";
+  if (steps[currentStep].type === "remove") {
+    checkBtn.style.display = "none";
+    removeBox.style.display = "inline-block";
+    resultDiv.textContent = "";
+    isFinishedDraw = false;
+    tempLine = null;
+    tempX = null;
+    tempY = null;
+    lockX = null;
+    fibIndexInput.value = "";
+    removeBtn.disabled = false;
+  } else {
+    checkBtn.style.display = "inline-block";
+    removeBox.style.display = "none";
+    checkBtn.disabled = true;
+    resultDiv.textContent = "";
+    tempLine = null;
+    tempX = null;
+    tempY = null;
+    lockX = null;
+    isFinishedDraw = false;
+  }
+  redrawAll();
+}
+
+function drawHorizontal(x, y, color, temp=false) {
+  const halfLength = 5;
+  ctx.beginPath();
+  ctx.moveTo(x - halfLength, y);
+  ctx.lineTo(x + halfLength, y);
+  ctx.strokeStyle = color || "#00aa00";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (!temp) {
+    ctx.font = "bold 16px Arial";
+    ctx.fillStyle = color || "#00aa00";
+    ctx.fillText("H", x + halfLength + 5, y - 4);
+  }
+}
+
+function drawVertical(x, color, temp=false) {
+  ctx.beginPath();
+  ctx.moveTo(x, 0);
+  ctx.lineTo(x, canvas.height);
+  ctx.strokeStyle = color || "#8000ff";
+  ctx.lineWidth = 3;
+  ctx.setLineDash([14, 9]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (!temp) {
+    ctx.font = "bold 30px Arial";
+    ctx.fillStyle = color || "#8000ff";
+    ctx.fillText("V", x + 7, 35);
+  }
+}
+
+function drawCrosshair() {
+  if (crossX != null && crossY != null) {
+    ctx.save();
+    ctx.setLineDash([4, 8]);
+    ctx.strokeStyle = "#aaa";
+    ctx.lineWidth = 1.25;
+    ctx.beginPath(); ctx.moveTo(crossX, 0); ctx.lineTo(crossX, canvas.height);
+    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, crossY); ctx.lineTo(canvas.width, crossY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+}
+
+function redrawAll() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  lines.forEach((line, i) => {
+    if (line.vertical) drawVertical(line.x, line.color, false);
+    else if (line.horizontal) drawHorizontal(line.x, line.y, line.color, false);
+  });
+  if (tempY != null && steps[currentStep].type === "horizontal") drawHorizontal(lockX, tempY, "#00aa00", true);
+  if (tempX != null && steps[currentStep].type === "vertical") drawVertical(tempX, "#8000ff", true);
+  drawCrosshair();
+}
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  crossX = e.clientX - rect.left;
+  crossY = e.clientY - rect.top;
+  redrawAll();
+});
+
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  if (steps[currentStep].type === "vertical") {
+    tempX = e.clientX - rect.left;
+    console.log(`VERTICAL click at X = ${tempX}`);
+    isFinishedDraw = true;
+    checkBtn.disabled = false;
+    resultDiv.textContent = "";
+    redrawAll();
+  } else if (steps[currentStep].type === "horizontal") {
+    tempY = e.clientY - rect.top;
+    lockX = e.clientX - rect.left;
+    console.log(`HORIZONTAL click at X = ${lockX}, Y = ${tempY}`);
+    isFinishedDraw = true;
+    checkBtn.disabled = false;
+    resultDiv.textContent = "";
+    redrawAll();
+  }
+});
+
+checkBtn.onclick = function() {
+  if (steps[currentStep].type === "horizontal") {
+    const margin = 15;
+    if (tempY != null && Math.abs(tempY - steps[currentStep].answerY) < margin) {
+      lines.push({ horizontal: true, x: lockX, y: tempY, color: "#00aa00" });
+      tempY = null;
+      lockX = null;
+      currentStep++;
+      if (currentStep < steps.length) {
+        showStep();
+        resultDiv.innerHTML = `<span style="color:#237b13;">ถูกต้อง! ไปต่อได้เลย</span>`;
+      } else {
+        questionDiv.textContent = "จบทุกข้อแล้ว! คุณเก่งมาก 🎉";
+        resultDiv.innerHTML = `<span style="color:#237b13;">เยี่ยม! คุณทำครบทุกขั้นตอนแล้ว</span>`;
+        checkBtn.disabled = true;
+      }
+    } else {
+      resultDiv.innerHTML = `<span style="color:#c00;">ยังไม่ถูกต้อง ลองใหม่อีกครั้ง</span>`;
+    }
+  }
+};
+
+showStep();
+</script>
+</body>
+</html>
